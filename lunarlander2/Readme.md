@@ -1,6 +1,6 @@
 # How to use
 
-open 'train_deep_q_learning.pynb'  
+open 'train_deep_q_learning.pynb' in [Colab][https://colab.research.google.com/github/tjohanne42/deep_q_learning/blob/main/train_deep_q_learning.ipynb]
 or
 ```shell
 pip install -r requirements.txt
