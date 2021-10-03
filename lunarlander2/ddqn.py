@@ -50,7 +50,7 @@ def build_dqn(lr, n_actions, input_dims, fc1_dims, fc2_dims):
                 Activation('relu'),
                 Dense(n_actions)])
 
-    model.compile(optimizer=Adam(lr=lr), loss='mse')
+    model.compile(optimizer=Adam(learning_rate=lr), loss='mse')
 
     return model
 
