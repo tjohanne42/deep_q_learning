@@ -167,10 +167,13 @@ class Pygame2048(object):
 		self.ft_gui.clear()
 
 		self.button_size = (200, 75)
-		self.ft_gui.add_button(id_="play", pos=(int(self.screen.get_width() / 2 - self.button_size[0] / 2), 150),
+		self.ft_gui.add_button(id_="play", pos=(int(self.screen.get_width() / 4 - self.button_size[0] / 2), 150),
 			size=self.button_size, text="Play", function=self._load_scene_1)
-		self.ft_gui.add_button(id_="bot_show", pos=(int(self.screen.get_width() / 2 - self.button_size[0] / 2), self.button_size[1] + self.param["interface_sep"] + 150),
+		self.ft_gui.add_button(id_="bot_show", pos=(int(self.screen.get_width() / 4 * 2 - self.button_size[0] / 2), 150),
 			size=self.button_size, text="Bot show", function=self._load_scene_2)
+		self.ft_gui.add_button(id_="bot_train", pos=(int(self.screen.get_width() / 4 * 3 - self.button_size[0] / 2), 150),
+			size=self.button_size, text="Bot train", function=self._load_scene_3)
+
 
 	def _event_scene_0(self, event):
 		if event.type == pg.VIDEORESIZE:
@@ -193,6 +196,7 @@ class Pygame2048(object):
 		self.ft_gui.clear()
 		self.game_state = self.env_2048.start_game(4)
 		self.game_done = False
+		self.fusion = []
 
 	def _event_scene_1(self, event):
 		if not self.game_done and event.type == pg.KEYUP:
@@ -205,7 +209,7 @@ class Pygame2048(object):
 					action = 2
 				elif event.key == pg.K_LEFT:
 					action = 3
-				tmp_game_state, self.game_done, fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
+				tmp_game_state, self.game_done, self.fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
 				if self.game_state != tmp_game_state:
 					self.game_state = tmp_game_state
 				if self.game_done:
@@ -337,15 +341,83 @@ class Pygame2048(object):
 
 # _______________________________________________________________________________________________________________________________
 # SCENE 3 bot_train
+	def _pause_auto_bot_scene_3(self):
+		if self.auto:
+			self.auto = False
+			self.ft_gui.buttons["auto"].display_on = True
+			self.ft_gui.buttons["pause"].display_on = False
+		else:
+			self.auto = True
+			self.ft_gui.buttons["auto"].display_on = False
+			self.ft_gui.buttons["pause"].display_on = True
+
+	def _one_step_scene_3(self):
+		if event.type == pg.VIDEORESIZE:
+			self.ft_gui.buttons["auto"].rect.x = int(self.screen.get_width() / 4 - self.button_size[0] / 2)
+			self.ft_gui.buttons["auto"].rect.y = 150
+			self.ft_gui.buttons["pause"].rect.x = int(self.screen.get_width() / 4 - self.button_size[0] / 2)
+			self.ft_gui.buttons["pause"].rect.y = 150
+			self.ft_gui.buttons["one_step"].rect.x = int(self.screen.get_width() / 4 * 2 - self.button_size[0] / 2)
+			self.ft_gui.buttons["one_step"].rect.y = 150
+			self.ft_gui.buttons["retry"].rect.x = int(self.screen.get_width() / 4 * 3 - self.button_size[0] / 2)
+			self.ft_gui.buttons["retry"].rect.y = 150
+		elif not self.game_done and not self.game_done and event.type == pg.KEYUP:
+			if event.key in [pg.K_UP, pg.K_RIGHT, pg.K_DOWN, pg.K_LEFT]:
+				if event.key == pg.K_UP:
+					action = 0
+				elif event.key == pg.K_RIGHT:
+					action = 1
+				elif event.key == pg.K_DOWN:
+					action = 2
+				elif event.key == pg.K_LEFT:
+					action = 3
+				tmp_game_state, self.game_done, self.fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
+				if self.game_state != tmp_game_state:
+					self.game_state = tmp_game_state
+				if self.game_done:
+					print("self.game_done")
+
+	def _show_graph_scene_3(self):
+		pass
+
 	def _load_scene_3(self):
-		self._load_surface_3
+		# interface bot train
 		print("3bot_train scene :D")
+		self.scene = 3
+		self.button_size = (200, 75)
+		self.ft_gui.clear()
+		self.ft_gui.add_button(id_="auto", pos=(int(self.screen.get_width() / 4 - self.button_size[0] / 2), 150),
+			size=self.button_size, text="Auto", function=self._pause_auto_bot_scene_3)
+		self.ft_gui.add_button(id_="pause", pos=(int(self.screen.get_width() / 4 - self.button_size[0] / 2), 150),
+			size=self.button_size, text="Pause", function=self._pause_auto_bot_scene_3, display_on=False)
+		self.ft_gui.add_button(id_="one_step", pos=(int(self.screen.get_width() / 4 * 2 - self.button_size[0] / 2), 150),
+			size=self.button_size, text="One Step", function=self._one_step_scene_3)
+		self.ft_gui.add_button(id_="graph", pos=(int(self.screen.get_width() / 4 * 3 - self.button_size[0] / 2), 150),
+			size=self.button_size, text="Graph", function=self._show_graph_scene_3)
+
+		self.game_state = self.env_2048.start_game(4)
+		self.game_done = False
+		self.auto = False
+		self.fusion = []
+		# self.bot_speed = 0.1
+		self.bot_speed = 0.05
+		self.show_graph = False
+
 
 	def _event_scene_3(self, event):
 		pass
 
 	def _display_scene_3(self):
-		pass
+		self.game_surface = self._get_surface_2048(self.game_state,
+												  (min(self.screen.get_width(), self.screen.get_height()) / 3 * 2, min(self.screen.get_width(), self.screen.get_height()) / 3 * 2),
+												  font_size=20,
+												  fusion=self.fusion,
+												  game_done=self.game_done)
+		self.screen.blit(self.game_surface, (self.screen.get_width()/2 - self.game_surface.get_width()/2,
+											 self.screen.get_height() - self.game_surface.get_height() - self.param["interface_sep"]))
+		text_surface = self.fonts[20].render("Score: " + str(sum(self.game_state)), True, WHITE_TXT)
+		self.screen.blit(text_surface, (self.screen.get_width()/2 - text_surface.get_width()/2,
+										self.screen.get_height() - self.game_surface.get_height() - text_surface.get_height() - self.param["interface_sep"]*2))
 # -------------------------------------------------------------------------------------------------------------------------------
 
 	def event(self, event):
