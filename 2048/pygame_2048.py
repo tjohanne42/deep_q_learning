@@ -13,6 +13,7 @@ from ft_pg.ft_pg_gui import *
 from env_2048 import *
 from utils import *
 from ft_pg.ft_pg_music_player import *
+from ddqn_agent import DDQNAgent
 
 
 BG = (40, 40, 40)
@@ -37,7 +38,7 @@ class Pygame2048(object):
 	def _init_variables(self, img_path="img"):
 		self.scene = None
 		self.env_2048 = Env2048()
-		self.background_scene_exec = {2 : []}
+		self.background_scene_exec = {2 : [], 3: []}
 		self.param["interface_sep"] = 20
 		self.surface = {"fire_effect": [pg.image.load(f"{img_path}/{x}") for x  in os.listdir(img_path) if ".png" in x and "fire_effect" in x],
 						"water_effect": [pg.image.load(f"{img_path}/{x}") for x  in os.listdir(img_path) if ".png" in x and "water_effect" in x],
@@ -45,7 +46,7 @@ class Pygame2048(object):
 						"game_over": [pg.image.load(f"{img_path}/{x}") for x  in os.listdir(img_path) if ".png" in x and "game_over" in x]}
 
 	def quit(self):
-		self.background_scene_exec = {2 : []}
+		self.background_scene_exec = {2 : [], 3: []}
 		self.running = False
 
 # SCENES_LIST: [menu_principal : 0, game: 1, bot_show: 2, bot_train: 3]
@@ -209,7 +210,7 @@ class Pygame2048(object):
 					action = 2
 				elif event.key == pg.K_LEFT:
 					action = 3
-				tmp_game_state, self.game_done, self.fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
+				tmp_game_state, score, self.game_done, self.fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
 				if self.game_state != tmp_game_state:
 					self.game_state = tmp_game_state
 				if self.game_done:
@@ -244,7 +245,7 @@ class Pygame2048(object):
 			self.background_scene_exec[2].append(id_)
 		except:
 			self.background_scene_exec[2] = id_
-		while id_ in self.background_scene_exec[2]:
+		while id_ in self.background_scene_exec[2] and self.running:
 			if self.auto:
 				action = random.choice([0, 1, 2, 3])
 				tmp_game_state, self.game_done, self.fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
@@ -341,6 +342,60 @@ class Pygame2048(object):
 
 # _______________________________________________________________________________________________________________________________
 # SCENE 3 bot_train
+	def _background_task_scene_3(self):
+		id_ = time.time()
+		try:
+			self.background_scene_exec[3].append(id_)
+		except:
+			self.background_scene_exec[3] = [id_]
+		while id_ in self.background_scene_exec[3] and self.running:
+			if self.auto:
+				timer = time.time()
+
+				action = self.agent.choose_action(self.game_state)
+
+				tmp_game_state, self.game_done, self.fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
+
+				
+				if self.game_state != tmp_game_state:
+					# reward = self.game_state.count(0) - tmp_game_state.count(0) + 1
+					# reward = max(self.game_state)
+					# reward = len(self.fusion)
+					if self.game_done:
+						reward = -1
+					else:
+						reward = self.game_state.count(0) - tmp_game_state.count(0) + 1
+						# reward = sum(self.game_state)
+					self.game_state = tmp_game_state
+					if self.n_game % 5 == 0:
+						self.game_surface = self._get_surface_2048(self.game_state,
+												  (min(self.screen.get_width(), self.screen.get_height()) / 3 * 2, min(self.screen.get_width(), self.screen.get_height()) / 3 * 2),
+												  font_size=20,
+												  fusion=self.fusion,
+												  game_done=self.game_done)
+					self.score += reward
+					self.agent.remember(self.game_state, action, reward, tmp_game_state, int(self.game_done))
+
+					self.agent.learn()
+				else:
+					reward = -1
+
+				if self.game_done:
+					self.eps_history.append(self.agent.epsilon)
+					self.ddqn_scores.append(self.score)
+					self.agent.save_model()
+					self.n_game += 1
+					self.game_state = self.env_2048.start_game(4)
+					self.game_done = False
+					self.score = 0
+					print("epsilon:", self.eps_history)
+					print("scores:", self.ddqn_scores)
+
+				# time.sleep(max(0, time.time() - timer() - self.bot_speed))
+			else:
+				time.sleep(0)
+		exit()
+
 	def _pause_auto_bot_scene_3(self):
 		if self.auto:
 			self.auto = False
@@ -352,30 +407,16 @@ class Pygame2048(object):
 			self.ft_gui.buttons["pause"].display_on = True
 
 	def _one_step_scene_3(self):
-		if event.type == pg.VIDEORESIZE:
-			self.ft_gui.buttons["auto"].rect.x = int(self.screen.get_width() / 4 - self.button_size[0] / 2)
-			self.ft_gui.buttons["auto"].rect.y = 150
-			self.ft_gui.buttons["pause"].rect.x = int(self.screen.get_width() / 4 - self.button_size[0] / 2)
-			self.ft_gui.buttons["pause"].rect.y = 150
-			self.ft_gui.buttons["one_step"].rect.x = int(self.screen.get_width() / 4 * 2 - self.button_size[0] / 2)
-			self.ft_gui.buttons["one_step"].rect.y = 150
-			self.ft_gui.buttons["retry"].rect.x = int(self.screen.get_width() / 4 * 3 - self.button_size[0] / 2)
-			self.ft_gui.buttons["retry"].rect.y = 150
-		elif not self.game_done and not self.game_done and event.type == pg.KEYUP:
-			if event.key in [pg.K_UP, pg.K_RIGHT, pg.K_DOWN, pg.K_LEFT]:
-				if event.key == pg.K_UP:
-					action = 0
-				elif event.key == pg.K_RIGHT:
-					action = 1
-				elif event.key == pg.K_DOWN:
-					action = 2
-				elif event.key == pg.K_LEFT:
-					action = 3
-				tmp_game_state, self.game_done, self.fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
-				if self.game_state != tmp_game_state:
-					self.game_state = tmp_game_state
-				if self.game_done:
-					print("self.game_done")
+		if not self.game_done:
+
+			action = random.choice([0, 1, 2, 3])
+
+			tmp_game_state, self.game_done, self.fusion = self.env_2048.step(self.game_state, action, ret_fusion=True)
+			if self.game_state != tmp_game_state:
+				self.game_state = tmp_game_state
+			if self.game_done:
+				print("self.game_done")
+				self.background_scene_exec[2].pop(id_)
 
 	def _show_graph_scene_3(self):
 		pass
@@ -395,28 +436,48 @@ class Pygame2048(object):
 		self.ft_gui.add_button(id_="graph", pos=(int(self.screen.get_width() / 4 * 3 - self.button_size[0] / 2), 150),
 			size=self.button_size, text="Graph", function=self._show_graph_scene_3)
 
-		self.game_state = self.env_2048.start_game(4)
-		self.game_done = False
+		""" load existant model """
+		fname = "model/new_model.h5"
+		self.agent = DDQNAgent(alpha=0.0005, gamma=0.99, n_actions=4, epsilon=1.0,
+							batch_size=64, input_dims=16, fname=fname)
+		try:
+			self.agent.load_model()
+			print(f"model {fname} loaded")
+		except:
+			print("create new model")
+
 		self.auto = False
 		self.fusion = []
-		# self.bot_speed = 0.1
 		self.bot_speed = 0.05
 		self.show_graph = False
+
+		self.n_game = 0
+		self.ddqn_scores = []
+		self.eps_history = []
+
+		self.game_state = self.env_2048.start_game(4)
+		self.game_done = False
+		self.game_surface = self._get_surface_2048(self.game_state,
+												  (min(self.screen.get_width(), self.screen.get_height()) / 3 * 2, min(self.screen.get_width(), self.screen.get_height()) / 3 * 2),
+												  font_size=20,
+												  fusion=self.fusion,
+												  game_done=self.game_done)
+		self.score = 0
+		
+		concurrent.futures.ThreadPoolExecutor().submit(self._background_task_scene_3)
 
 
 	def _event_scene_3(self, event):
 		pass
 
 	def _display_scene_3(self):
-		self.game_surface = self._get_surface_2048(self.game_state,
-												  (min(self.screen.get_width(), self.screen.get_height()) / 3 * 2, min(self.screen.get_width(), self.screen.get_height()) / 3 * 2),
-												  font_size=20,
-												  fusion=self.fusion,
-												  game_done=self.game_done)
 		self.screen.blit(self.game_surface, (self.screen.get_width()/2 - self.game_surface.get_width()/2,
 											 self.screen.get_height() - self.game_surface.get_height() - self.param["interface_sep"]))
 		text_surface = self.fonts[20].render("Score: " + str(sum(self.game_state)), True, WHITE_TXT)
-		self.screen.blit(text_surface, (self.screen.get_width()/2 - text_surface.get_width()/2,
+		self.screen.blit(text_surface, (self.screen.get_width()/3 - text_surface.get_width()/2,
+										self.screen.get_height() - self.game_surface.get_height() - text_surface.get_height() - self.param["interface_sep"]*2))
+		text_surface = self.fonts[20].render("n_game: " + str(self.n_game), True, WHITE_TXT)
+		self.screen.blit(text_surface, (self.screen.get_width()/3*2 - text_surface.get_width()/2,
 										self.screen.get_height() - self.game_surface.get_height() - text_surface.get_height() - self.param["interface_sep"]*2))
 # -------------------------------------------------------------------------------------------------------------------------------
 
