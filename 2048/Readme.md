@@ -1,6 +1,4 @@
 # How to use
-```shjll
-pip install -r requirements.txt
-cd 2048
+```shell
 python pygame_2048.py
 ```
